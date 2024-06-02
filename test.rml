@@ -1,0 +1,16 @@
+<head>
+    <title>
+    <script>
+        function click()
+            dom.get(0).set_inner("You clicked me!")
+        end
+    </script>
+</head>
+<body>
+    <h>Heading</h>
+    <p>Text</p>
+    <button onclick="click()">Click me!</button>
+    <div>
+        <p>Text inside a div</p>
+    </div>
+</body>
