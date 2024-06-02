@@ -1,8 +1,8 @@
 <head>
-    <title>
+    <title>Test</title>
     <script>
         function click()
-            dom.get(0).set_inner("You clicked me!")
+            dom.get(2).set_text("You clicked me!")
         end
     </script>
 </head>

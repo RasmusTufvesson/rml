@@ -10,16 +10,21 @@ pub struct Page {
 impl Page {
     pub fn render(&mut self, ui: &mut Ui) {
         for element in &mut self.body {
-            element.render(ui);
+            element.render(ui, Style::default());
         }
     }
 }
 
 pub trait Element {
-    fn set_inner(&mut self, new: Elements);
-    fn render(&mut self, ui: &mut Ui);
+    fn render(&mut self, ui: &mut Ui, style: Style);
 
-    fn clicked(&mut self) {}
+    fn set_inner(&mut self, new: Elements) {}
+    fn set_text(&mut self, text: String) {}
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct Style {
+    
 }
 
 pub fn parse(path: &str) -> anyhow::Result<Page> {
