@@ -1,5 +1,5 @@
 use eframe::egui::{self, TextEdit};
-use crate::parser::Page;
+use crate::parser::{parse, Page};
 
 pub struct App {
     file_text: String,
@@ -21,7 +21,7 @@ impl App {
     }
 
     fn load_page(&mut self) {
-
+        self.page = parse(&self.file_text);
     }
 }
 

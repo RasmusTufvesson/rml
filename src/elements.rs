@@ -1,7 +1,7 @@
 use crate::parser::{Element, Elements, Style};
 
 pub struct Heading {
-    text: String,
+    pub text: String,
 }
 
 impl Element for Heading {
@@ -15,7 +15,7 @@ impl Element for Heading {
 }
 
 pub struct Paragraph {
-    text: String,
+    pub text: String,
 }
 
 impl Element for Paragraph {
@@ -29,8 +29,8 @@ impl Element for Paragraph {
 }
 
 pub struct Button {
-    text: String,
-    on_click: String,
+    pub text: String,
+    pub on_click: String,
 }
 
 impl Element for Button {
@@ -46,7 +46,7 @@ impl Element for Button {
 }
 
 pub struct Div {
-    inner: Elements,
+    pub inner: Elements,
 }
 
 impl Element for Div {
