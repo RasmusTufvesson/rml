@@ -1,7 +1,9 @@
 use std::fs;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Ok};
 use eframe::egui::{TextBuffer, Ui};
+
+use crate::elements::{Button, Div, Heading, Paragraph};
 
 pub type Elements = Vec<Box<dyn Element>>;
 
@@ -33,18 +35,18 @@ pub struct Style {
 pub fn parse(path: &str) -> anyhow::Result<Page> {
     let string = fs::read_to_string(path)?;
     let tags = parse_tags(&string)?;
-    println!("tags: {:?}", tags);
-    Err(anyhow!("Not implemented"))
+    let page = tags_to_page(tags)?;
+    Ok(page)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Tag {
     name: String,
     attributes: Vec<(String, String)>,
     children: Vec<TagOrText>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum TagOrText {
     Tag(Tag),
     Text(String),
@@ -134,6 +136,7 @@ fn parse_tags(string: &str) -> anyhow::Result<Vec<TagOrText>> {
                         let index = child_stack.len() - 1;
                         child_stack[index].push(TagOrText::Text(text_buffer.take()));
                     }
+                    text_buffer.clear();
                     new_state = ParseState::TagStart;
                 } else {
                     text_buffer.push(chr);
@@ -143,4 +146,90 @@ fn parse_tags(string: &str) -> anyhow::Result<Vec<TagOrText>> {
         state = new_state;
     }
     Ok(child_stack.pop().unwrap())
+}
+
+fn tags_to_page(tags: Vec<TagOrText>) -> anyhow::Result<Page> {
+    let mut title = "Untitled".to_string();
+    let mut body = vec![];
+    if let Some(TagOrText::Tag(head)) = tags.get(0) {
+        if head.name == "head" {
+            for tag in &head.children {
+                match tag {
+                    TagOrText::Tag(tag) => {
+                        if tag.name == "title" {
+                            if let Some(TagOrText::Text(text)) = tag.children.get(0) {
+                                title = text.clone();
+                            } else {
+                                return Err(anyhow!("Title tag does not contain title"));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else {
+            return Err(anyhow!("Page does not start with head"));
+        }
+    } else {
+        return Err(anyhow!("Page does not start with head"));
+    }
+    if let Some(TagOrText::Tag(body_tag)) = tags.get(1) {
+        if body_tag.name == "body" {
+            for tag in &body_tag.children {
+                match tag {
+                    TagOrText::Tag(tag) => {
+                        body.push(tag_to_elemets(tag.clone())?);
+                    }
+                    _ => {
+                        return Err(anyhow!("Text in body tag"));
+                    }
+                }
+            }
+        } else {
+            return Err(anyhow!("Second tag is not body"));
+        }
+    } else {
+        return Err(anyhow!("Second tag is not body"));
+    }
+    Ok(Page { title, body })
+}
+
+fn tag_to_elemets(tag: Tag) -> anyhow::Result<Box<dyn Element>> {
+    Ok(match tag.name.as_str() {
+        "h" => {
+            let text = get_text(tag)?;
+            Box::new(Heading { text })
+        }
+        "p" => {
+            let text = get_text(tag)?;
+            Box::new(Paragraph { text })
+        }
+        "button" => {
+            let on_click = tag.attributes.iter().find(|(attr, _)| attr == "onclick").unwrap_or(&("".to_string(), "".to_string())).1.clone();
+            let text = get_text(tag)?;
+            Box::new(Button { text, on_click })
+        }
+        "div" => {
+            let mut inner = vec![];
+            for tag in tag.children {
+                if let TagOrText::Tag(tag) = tag {
+                    inner.push(tag_to_elemets(tag)?);
+                } else {
+                    return Err(anyhow!("Text in div"));
+                }
+            }
+            Box::new(Div { inner })
+        }
+        _ => {
+            return Err(anyhow!("Unknown tag '{}'", tag.name));
+        }
+    })
+}
+
+fn get_text(tag: Tag) -> anyhow::Result<String> {
+    if let Some(TagOrText::Text(text)) = tag.children.get(0) {
+        Ok(text.clone())
+    } else {
+        Err(anyhow!("Could not find text for element"))
+    }
 }
