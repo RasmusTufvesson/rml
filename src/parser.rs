@@ -1,27 +1,26 @@
 use std::fs;
-
 use anyhow::{anyhow, Ok};
 use eframe::egui::{TextBuffer, Ui};
-
-use crate::elements::{Button, Div, Heading, Paragraph};
+use crate::{app::Executer, elements::{Button, Div, Heading, Paragraph}};
 
 pub type Elements = Vec<Box<dyn Element>>;
 
 pub struct Page {
     pub title: String,
     body: Elements,
+    pub scripts: Vec<String>,
 }
 
 impl Page {
-    pub fn render(&mut self, ui: &mut Ui) {
+    pub fn render(&mut self, ui: &mut Ui, executer: &mut Executer) {
         for element in &mut self.body {
-            element.render(ui, Style::default());
+            element.render(ui, Style::default(), executer);
         }
     }
 }
 
 pub trait Element {
-    fn render(&mut self, ui: &mut Ui, style: Style);
+    fn render(&mut self, ui: &mut Ui, style: Style, executer: &mut Executer);
 
     fn set_inner(&mut self, new: Elements) {}
     fn set_text(&mut self, text: String) {}
@@ -150,6 +149,7 @@ fn parse_tags(string: &str) -> anyhow::Result<Vec<TagOrText>> {
 
 fn tags_to_page(tags: Vec<TagOrText>) -> anyhow::Result<Page> {
     let mut title = "Untitled".to_string();
+    let mut scripts = vec![];
     let mut body = vec![];
     if let Some(TagOrText::Tag(head)) = tags.get(0) {
         if head.name == "head" {
@@ -160,8 +160,16 @@ fn tags_to_page(tags: Vec<TagOrText>) -> anyhow::Result<Page> {
                             if let Some(TagOrText::Text(text)) = tag.children.get(0) {
                                 title = text.clone();
                             } else {
-                                return Err(anyhow!("Title tag does not contain title"));
+                                return Err(anyhow!("Empty title tag"));
                             }
+                        } else if tag.name == "script" {
+                            if let Some(TagOrText::Text(text)) = tag.children.get(0) {
+                                scripts.push(text.clone());
+                            } else {
+                                return Err(anyhow!("Empty script tag"));
+                            }
+                        } else {
+                            return Err(anyhow!("Unknown tag '{}' in head", tag.name));
                         }
                     }
                     _ => {}
@@ -191,7 +199,7 @@ fn tags_to_page(tags: Vec<TagOrText>) -> anyhow::Result<Page> {
     } else {
         return Err(anyhow!("Second tag is not body"));
     }
-    Ok(Page { title, body })
+    Ok(Page { title, body, scripts })
 }
 
 fn tag_to_elemets(tag: Tag) -> anyhow::Result<Box<dyn Element>> {

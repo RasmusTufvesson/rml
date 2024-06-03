@@ -1,11 +1,11 @@
-use crate::parser::{Element, Elements, Style};
+use crate::{app::Executer, parser::{Element, Elements, Style}};
 
 pub struct Heading {
     pub text: String,
 }
 
 impl Element for Heading {
-    fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style) {
+    fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style, _: &mut Executer) {
         ui.heading(&self.text);
     }
 
@@ -19,7 +19,7 @@ pub struct Paragraph {
 }
 
 impl Element for Paragraph {
-    fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style) {
+    fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style, _: &mut Executer) {
         ui.label(&self.text);
     }
 
@@ -34,9 +34,9 @@ pub struct Button {
 }
 
 impl Element for Button {
-    fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style) {
+    fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style, executer: &mut Executer) {
         if ui.button(&self.text).clicked() {
-            println!("Run lua");
+            executer.try_run(&self.on_click);
         }
     }
 
@@ -50,9 +50,9 @@ pub struct Div {
 }
 
 impl Element for Div {
-    fn render(&mut self, ui: &mut eframe::egui::Ui, style: Style) {
+    fn render(&mut self, ui: &mut eframe::egui::Ui, style: Style, executer: &mut Executer) {
         for element in &mut self.inner {
-            element.render(ui, style)
+            element.render(ui, style, executer)
         }
     }
 

@@ -1,9 +1,28 @@
 use eframe::egui::{self, TextEdit};
+use mlua::Lua;
 use crate::parser::{parse, Page};
+
+pub struct Executer {
+    pub lua: Lua,
+    pub console: Vec<String>,
+}
+
+impl Executer {
+    pub fn log(&mut self, msg: impl ToString) {
+        self.console.push(msg.to_string());
+    }
+
+    pub fn try_run(&mut self, code: &str) {
+        if let Err(why) = self.lua.load(code).exec() {
+            self.log(why);
+        }
+    }
+}
 
 pub struct App {
     file_text: String,
     page: anyhow::Result<Page>,
+    executer: Executer,
 }
 
 impl Default for App {
@@ -11,6 +30,10 @@ impl Default for App {
         Self {
             file_text: "".to_string(),
             page: Err(anyhow::anyhow!("Enter file path")),
+            executer: Executer {
+                lua: Lua::new(),
+                console: vec![],
+            },
         }
     }
 }
@@ -22,6 +45,13 @@ impl App {
 
     fn load_page(&mut self) {
         self.page = parse(&self.file_text);
+        self.executer.console.clear();
+        if let Ok(page) = &self.page {
+            self.executer.lua = Lua::new();
+            for script in &page.scripts {
+                self.executer.try_run(&script);
+            }
+        }
     }
 }
 
@@ -43,10 +73,18 @@ impl eframe::App for App {
             });
         });
 
+        if self.executer.console.len() != 0 {
+            egui::SidePanel::right("console").show(ctx, |ui| {
+                for message in &self.executer.console {
+                    ui.label(message);
+                }
+            });
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
             match &mut self.page {
                 Ok(page) => {
-                    page.render(ui);
+                    page.render(ui, &mut self.executer);
                 }
                 Err(why) => {
                     ui.heading("Could not load page");
