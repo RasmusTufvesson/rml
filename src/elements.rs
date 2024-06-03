@@ -36,7 +36,7 @@ pub struct Button {
 impl Element for Button {
     fn render(&mut self, ui: &mut eframe::egui::Ui, _: Style, executer: &mut Executer) {
         if ui.button(&self.text).clicked() {
-            executer.try_run(&self.on_click);
+            executer.try_run(&self.on_click, "onclick");
         }
     }
 

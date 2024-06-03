@@ -12,8 +12,8 @@ impl Executer {
         self.console.push(msg.to_string());
     }
 
-    pub fn try_run(&mut self, code: &str) {
-        if let Err(why) = self.lua.load(code).exec() {
+    pub fn try_run(&mut self, code: &str, name: &str) {
+        if let Err(why) = self.lua.load(code).set_name(name).exec() {
             self.log(why);
         }
     }
@@ -49,7 +49,7 @@ impl App {
         if let Ok(page) = &self.page {
             self.executer.lua = Lua::new();
             for script in &page.scripts {
-                self.executer.try_run(&script);
+                self.executer.try_run(&script, "script");
             }
         }
     }
