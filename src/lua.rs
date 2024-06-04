@@ -1,4 +1,5 @@
 use std::{collections::VecDeque, sync::mpsc::{self, Receiver, SyncSender}};
+use eframe::egui::{Context, OpenUrl};
 use mlua::{Error, FromLua, Lua, Result, Table, UserData, Value};
 
 use crate::parser::Page;
@@ -25,13 +26,19 @@ impl Executer {
         }
     }
 
-    pub fn update_document(&mut self, page: &mut Page) {
+    pub fn update_document(&mut self, page: &mut Page, location: &mut Option<String>, ctx: &Context) {
         while let Ok(change) = self.changes.try_recv() {
             match change {
                 DocumentChange::Log(text) => self.log(text),
                 DocumentChange::SetInner(path, inner) => todo!(),
                 DocumentChange::SetText(path, text) => {
                     page.set_path_text(path, text, self);
+                }
+                DocumentChange::SetLocation(link) => {
+                    *location = Some(link);
+                }
+                DocumentChange::OpenLink(link) => {
+                    ctx.open_url(OpenUrl::same_tab(link));
                 }
             }
         }
@@ -47,6 +54,10 @@ impl Executer {
         let sender = self.changes_sender.clone();
         let document = Document { changes_sender: sender };
         self.lua.globals().set("document", document).unwrap();
+    }
+
+    pub fn send_change(&self, change: DocumentChange) {
+        self.changes_sender.send(change).unwrap();
     }
 }
 
@@ -102,6 +113,12 @@ impl UserData for Document {
                 Err(_) => Err(Error::external("Could not send document change")),
             }
         });
+        methods.add_method("set_location", |_, this, text: String| {
+            match this.changes_sender.send(DocumentChange::Log(text)) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::external("Could not send document change")),
+            }
+        });
     }
 }
 
@@ -109,4 +126,6 @@ pub enum DocumentChange {
     SetText(VecDeque<usize>, String),
     SetInner(VecDeque<usize>, String),
     Log(String),
+    SetLocation(String),
+    OpenLink(String),
 }

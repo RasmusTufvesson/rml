@@ -5,13 +5,26 @@
             document:log("test")
             document:set_text({2}, "You clicked me!")
         end
+        function click_link()
+            document:set_text({4,3}, "yup, its a button")
+        end
     </script>
 </head>
 <body>
     <h>Heading</h>
     <p>Text</p>
     <button onclick="click()">Click me!</button>
-    <div>
+    <div align="center">
         <p>Text inside a div</p>
+        <space></space>
+        <p>^ Added space</p>
+        <divider></divider>
+        <p>^ Divider</p>
+    </div>
+    <div direction="right">
+        <p>Links: </p>
+        <weblink dst="https://google.com">link to web</weblink>
+        <link dst="dst.rml">link to rml file</link>
+        <fakelink onclick="click_link()">actually a button</fakelink>
     </div>
 </body>

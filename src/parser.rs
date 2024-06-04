@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, fs};
 use anyhow::{anyhow, Ok};
-use eframe::egui::{TextBuffer, Ui};
-use crate::{lua::Executer, elements::{Button, Div, Heading, Paragraph}};
+use eframe::egui::{Layout, TextBuffer, Ui};
+use crate::{elements::{Button, Div, Divider, FakeLink, Heading, Link, Paragraph, Space, WebLink}, lua::Executer};
 
 pub type Elements = Vec<Box<dyn Element>>;
 
@@ -23,10 +23,28 @@ impl Page {
             Some(index) => {
                 match self.body.get_mut(index) {
                     Some(element) => {
+                        element.set_path_text(path, text, executer);
+                    }
+                    None => {
+                        executer.log_error("Invalid path");
+                    }
+                }
+            }
+            None => {
+                executer.log_error("Empty path");
+            }
+        }
+    }
+
+    pub fn set_path_inner(&mut self, mut path: VecDeque<usize>, inner: Elements, executer: &mut Executer) {
+        match path.pop_front() {
+            Some(index) => {
+                match self.body.get_mut(index) {
+                    Some(element) => {
                         if path.len() == 0 {
-                            element.set_text(text, executer);
+                            element.set_inner(inner, executer);
                         } else {
-                            element.set_path_text(path, text, executer);
+                            element.set_path_inner(path, inner, executer);
                         }
                     }
                     None => {
@@ -37,15 +55,19 @@ impl Page {
             None => {
                 executer.log_error("Empty path");
             }
-        };
+        }
     }
 
-    pub fn set_path_inner(&mut self, mut path: VecDeque<usize>, inner: Elements, executer: &mut Executer) {
+    pub fn set_path_attr(&mut self, mut path: VecDeque<usize>, attr: String, executer: &mut Executer) {
         match path.pop_front() {
             Some(index) => {
                 match self.body.get_mut(index) {
                     Some(element) => {
-                        element.set_path_inner(path, inner, executer);
+                        if path.len() == 0 {
+                            element.set_attr(attr, executer);
+                        } else {
+                            element.set_path_attr(path, attr, executer);
+                        }
                     }
                     None => {
                         executer.log_error("Invalid path");
@@ -55,7 +77,7 @@ impl Page {
             None => {
                 executer.log_error("Empty path");
             }
-        };
+        }
     }
 }
 
@@ -70,11 +92,19 @@ pub trait Element {
         executer.log_error("Element does not have text");
     }
 
+    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+        executer.log_error("Element does not have attributes");
+    }
+
     fn set_path_inner(&mut self, path: VecDeque<usize>, new: Elements, executer: &mut Executer) {
         executer.log_error("Element is not a container");
     }
 
     fn set_path_text(&mut self, path: VecDeque<usize>, text: String, executer: &mut Executer) {
+        executer.log_error("Element is not a container");
+    }
+
+    fn set_path_attr(&mut self, path: VecDeque<usize>, attr: String, executer: &mut Executer) {
         executer.log_error("Element is not a container");
     }
 }
@@ -266,11 +296,13 @@ fn tag_to_elemets(tag: Tag) -> anyhow::Result<Box<dyn Element>> {
             Box::new(Paragraph { text })
         }
         "button" => {
-            let on_click = tag.attributes.iter().find(|(attr, _)| attr == "onclick").unwrap_or(&("".to_string(), "".to_string())).1.clone();
+            let on_click = get_attribute(&tag, "onclick").unwrap_or("".to_string());
             let text = get_text(tag)?;
             Box::new(Button { text, on_click })
         }
         "div" => {
+            let direction = get_attribute(&tag, "direction");
+            let align = get_attribute(&tag, "align");
             let mut inner = vec![];
             for tag in tag.children {
                 if let TagOrText::Tag(tag) = tag {
@@ -279,7 +311,63 @@ fn tag_to_elemets(tag: Tag) -> anyhow::Result<Box<dyn Element>> {
                     return Err(anyhow!("Text in div"));
                 }
             }
-            Box::new(Div { inner })
+            if direction.is_none() && align.is_none() {
+                Box::new(Div { inner, layout: None })
+            } else {
+                let layout = Layout {
+                    main_dir: match direction {
+                        Some(val) => {
+                            match val.as_str() {
+                                "down" => eframe::egui::Direction::TopDown,
+                                "up" => eframe::egui::Direction::BottomUp,
+                                "left" => eframe::egui::Direction::RightToLeft,
+                                "right" => eframe::egui::Direction::LeftToRight,
+                                _ => return Err(anyhow!("Invalid direction '{}'", val)),
+                            }
+                        }
+                        None => eframe::egui::Direction::TopDown,
+                    },
+                    cross_align: match align {
+                        Some(val) => {
+                            match val.as_str() {
+                                "center" => eframe::egui::Align::Center,
+                                "max" => eframe::egui::Align::Max,
+                                "min" => eframe::egui::Align::Min,
+                                _ => return Err(anyhow!("Invalid align '{}'", val)),
+                            }
+                        }
+                        None => eframe::egui::Align::Min,
+                    },
+                    ..Default::default()
+                };
+                Box::new(Div { inner, layout: Some(layout) })
+            }
+        }
+        "space" => Box::new(Space),
+        "divider" => Box::new(Divider),
+        "weblink" => {
+            let dst = match get_attribute(&tag, "dst") {
+                Some(dst) => dst,
+                None => return Err(anyhow!("No dst attribute for weblink")),
+            };
+            let text = get_text(tag)?;
+            Box::new(WebLink { text, dst })
+        }
+        "link" => {
+            let dst = match get_attribute(&tag, "dst") {
+                Some(dst) => dst,
+                None => return Err(anyhow!("No dst attribute for link")),
+            };
+            let text = get_text(tag)?;
+            Box::new(Link { text, dst })
+        }
+        "fakelink" => {
+            let on_click = match get_attribute(&tag, "onclick") {
+                Some(on_click) => on_click,
+                None => return Err(anyhow!("No onclick attribute for fakelink")),
+            };
+            let text = get_text(tag)?;
+            Box::new(FakeLink { text, on_click })
         }
         _ => {
             return Err(anyhow!("Unknown tag '{}'", tag.name));
@@ -292,5 +380,13 @@ fn get_text(tag: Tag) -> anyhow::Result<String> {
         Ok(text.clone())
     } else {
         Err(anyhow!("Could not find text for element"))
+    }
+}
+
+fn get_attribute(tag: &Tag, attribute: &str) -> Option<String> {
+    if let Some((_, value)) = tag.attributes.iter().find(|(attr, _)| attr == attribute) {
+        Some(value.clone())
+    } else {
+        None
     }
 }

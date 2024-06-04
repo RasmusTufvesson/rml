@@ -5,6 +5,7 @@ pub struct App {
     file_text: String,
     page: anyhow::Result<Page>,
     executer: Executer,
+    show_console: bool,
 }
 
 impl Default for App {
@@ -13,6 +14,7 @@ impl Default for App {
             file_text: "".to_string(),
             page: Err(anyhow::anyhow!("Enter file path")),
             executer: Executer::new(),
+            show_console: false,
         }
     }
 }
@@ -53,8 +55,8 @@ impl eframe::App for App {
             });
         });
 
-        if self.executer.console.len() != 0 {
-            egui::SidePanel::right("console").show(ctx, |ui| {
+        if self.show_console {
+            egui::SidePanel::right("console").resizable(false).exact_width(100.0).show(ctx, |ui| {
                 for message in &self.executer.console {
                     ui.label(message);
                 }
@@ -62,15 +64,20 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            let mut location = None;
             match &mut self.page {
                 Ok(page) => {
-                    self.executer.update_document(page);
+                    self.executer.update_document(page, &mut location, ui.ctx());
                     page.render(ui, &mut self.executer);
                 }
                 Err(why) => {
                     ui.heading("Could not load page");
                     ui.label(why.to_string());
                 }
+            }
+            if let Some(location) = location {
+                self.file_text = location;
+                self.load_page();
             }
         });
     }
