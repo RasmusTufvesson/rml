@@ -3,6 +3,7 @@ use eframe::egui;
 mod app;
 mod parser;
 mod elements;
+mod lua;
 
 fn main() {
     env_logger::init();

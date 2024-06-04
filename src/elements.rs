@@ -1,4 +1,4 @@
-use crate::{app::Executer, parser::{Element, Elements, Style}};
+use crate::{lua::Executer, parser::{Element, Elements, Style}};
 
 pub struct Heading {
     pub text: String,
@@ -9,7 +9,7 @@ impl Element for Heading {
         ui.heading(&self.text);
     }
 
-    fn set_text(&mut self, text: String) {
+    fn set_text(&mut self, text: String, _: &mut Executer) {
         self.text = text;
     }
 }
@@ -23,7 +23,7 @@ impl Element for Paragraph {
         ui.label(&self.text);
     }
 
-    fn set_text(&mut self, text: String) {
+    fn set_text(&mut self, text: String, _: &mut Executer) {
         self.text = text;
     }
 }
@@ -40,7 +40,7 @@ impl Element for Button {
         }
     }
 
-    fn set_text(&mut self, text: String) {
+    fn set_text(&mut self, text: String, _: &mut Executer) {
         self.text = text;
     }
 }
@@ -56,7 +56,47 @@ impl Element for Div {
         }
     }
 
-    fn set_inner(&mut self, new: Elements) {
+    fn set_inner(&mut self, new: Elements, _: &mut Executer) {
         self.inner = new;
+    }
+
+    fn set_path_inner(&mut self, mut path: std::collections::VecDeque<usize>, new: Elements, executer: &mut Executer) {
+        match path.pop_front() {
+            Some(index) => {
+                match self.inner.get_mut(index) {
+                    Some(element) => {
+                        element.set_path_inner(path, new, executer);
+                    }
+                    None => {
+                        executer.log_error("Invalid path");
+                    }
+                }
+            }
+            None => {
+                self.inner = new;
+            }
+        };
+    }
+
+    fn set_path_text(&mut self, mut path: std::collections::VecDeque<usize>, text: String, executer: &mut Executer) {
+        match path.pop_front() {
+            Some(index) => {
+                match self.inner.get_mut(index) {
+                    Some(element) => {
+                        if path.len() == 0 {
+                            element.set_text(text, executer);
+                        } else {
+                            element.set_path_text(path, text, executer);
+                        }
+                    }
+                    None => {
+                        executer.log_error("Invalid path");
+                    }
+                }
+            }
+            None => {
+                executer.log_error("Div cannot contain text");
+            }
+        };
     }
 }

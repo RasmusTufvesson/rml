@@ -1,23 +1,5 @@
 use eframe::egui::{self, TextEdit};
-use mlua::Lua;
-use crate::parser::{parse, Page};
-
-pub struct Executer {
-    pub lua: Lua,
-    pub console: Vec<String>,
-}
-
-impl Executer {
-    pub fn log(&mut self, msg: impl ToString) {
-        self.console.push(msg.to_string());
-    }
-
-    pub fn try_run(&mut self, code: &str, name: &str) {
-        if let Err(why) = self.lua.load(code).set_name(name).exec() {
-            self.log(why);
-        }
-    }
-}
+use crate::{parser::{parse, Page}, lua::Executer};
 
 pub struct App {
     file_text: String,
@@ -30,10 +12,7 @@ impl Default for App {
         Self {
             file_text: "".to_string(),
             page: Err(anyhow::anyhow!("Enter file path")),
-            executer: Executer {
-                lua: Lua::new(),
-                console: vec![],
-            },
+            executer: Executer::new(),
         }
     }
 }
@@ -47,7 +26,7 @@ impl App {
         self.page = parse(&self.file_text);
         self.executer.console.clear();
         if let Ok(page) = &self.page {
-            self.executer.lua = Lua::new();
+            self.executer.init_lua();
             for script in &page.scripts {
                 self.executer.try_run(&script, "script");
             }
@@ -67,7 +46,8 @@ impl eframe::App for App {
                         ui.label("Error");
                     }
                 }
-                if ui.add(TextEdit::singleline(&mut self.file_text).hint_text("Enter path to file here...").desired_width(f32::INFINITY)).lost_focus() {
+                let response = ui.add(TextEdit::singleline(&mut self.file_text).hint_text("Enter path to file here...").desired_width(f32::INFINITY));
+                if response.lost_focus() && response.ctx.input(|state| state.key_pressed(egui::Key::Enter)) {
                     self.load_page();
                 }
             });
@@ -84,6 +64,7 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             match &mut self.page {
                 Ok(page) => {
+                    self.executer.update_document(page);
                     page.render(ui, &mut self.executer);
                 }
                 Err(why) => {
