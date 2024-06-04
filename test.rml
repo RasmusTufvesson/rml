@@ -32,4 +32,5 @@
         <p>Something something div</p>
     </div>
     <button onclick="document:set_attr({3}, 'align', 'max')">Change align of div</button>
+    <button onclick="document:set_title('Title changed')">Click to change title</button>
 </body>

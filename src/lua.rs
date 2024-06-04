@@ -25,7 +25,7 @@ impl Executer {
         }
     }
 
-    pub fn update_document(&mut self, page: &mut Page, location: &mut Option<String>, ctx: &Context) {
+    pub fn update_document(&mut self, page: &mut Page, location: &mut Option<String>, title: &mut Option<String>, ctx: &Context) {
         while let Ok(change) = self.changes.try_recv() {
             match change {
                 DocumentChange::Log(text) => self.log(text),
@@ -50,6 +50,9 @@ impl Executer {
                 }
                 DocumentChange::SetAttr(path, attr, value) => {
                     page.set_path_attr(path, attr, value, self);
+                }
+                DocumentChange::SetTitle(value) => {
+                    *title = Some(value);
                 }
             }
         }
@@ -139,14 +142,20 @@ impl UserData for Document {
                 Err(_) => Err(Error::external("Could not send document change")),
             }
         });
-        methods.add_method("set_location", |_, this, text: String| {
-            match this.changes_sender.send(DocumentChange::Log(text)) {
+        methods.add_method("set_location", |_, this, location: String| {
+            match this.changes_sender.send(DocumentChange::SetLocation(location)) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::external("Could not send document change")),
             }
         });
         methods.add_method("open_url", |_, this, url: String| {
             match this.changes_sender.send(DocumentChange::OpenLink(url)) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::external("Could not send document change")),
+            }
+        });
+        methods.add_method("set_title", |_, this, title: String| {
+            match this.changes_sender.send(DocumentChange::SetTitle(title)) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::external("Could not send document change")),
             }
@@ -161,4 +170,5 @@ pub enum DocumentChange {
     SetLocation(String),
     OpenLink(String),
     SetAttr(VecDeque<usize>, String, String),
+    SetTitle(String),
 }

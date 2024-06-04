@@ -76,6 +76,7 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut location = None;
+            let mut title = None;
             ScrollArea::both().auto_shrink(Vec2b {x: false, y: false}).show(ui, |ui| {
                 ui.interact(ui.max_rect(), Id::new("bg_central"), Sense::click()).context_menu(|ui| {
                     if ui.button(if self.show_console { "Close console" } else { "Open console" }).clicked() {
@@ -85,7 +86,7 @@ impl eframe::App for App {
                 });
                 match &mut self.page {
                     Ok(page) => {
-                        self.executer.update_document(page, &mut location, ui.ctx());
+                        self.executer.update_document(page, &mut location, &mut title, ui.ctx());
                         page.render(ui, &mut self.executer);
                     }
                     Err(why) => {
@@ -97,6 +98,11 @@ impl eframe::App for App {
             if let Some(location) = location {
                 self.file_text = location;
                 self.load_page();
+            }
+            if let Some(title) = title {
+                if let Ok(page) = &mut self.page {
+                    page.title = title;
+                }
             }
         });
 
