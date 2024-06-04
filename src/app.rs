@@ -48,6 +48,9 @@ impl eframe::App for App {
                         ui.label("Error");
                     }
                 }
+                if ui.button("Reload").clicked() {
+                    self.load_page();
+                }
                 let response = ui.add(TextEdit::singleline(&mut self.file_text).hint_text("Enter path to file here...").desired_width(f32::INFINITY));
                 if response.lost_focus() && response.ctx.input(|state| state.key_pressed(egui::Key::Enter)) {
                     self.load_page();
