@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, fs};
-use anyhow::{anyhow, Ok};
+use anyhow::anyhow;
 use eframe::egui::{Layout, TextBuffer, Ui};
 use crate::{elements::{Button, Div, Divider, FakeLink, Heading, Link, Paragraph, Space, WebLink}, lua::Executer};
 
@@ -23,7 +23,11 @@ impl Page {
             Some(index) => {
                 match self.body.get_mut(index) {
                     Some(element) => {
-                        element.set_path_text(path, text, executer);
+                        if path.len() == 0 {
+                            element.set_text(text, executer);
+                        } else {
+                            element.set_path_text(path, text, executer);
+                        }
                     }
                     None => {
                         executer.log_error("Invalid path");
@@ -58,15 +62,15 @@ impl Page {
         }
     }
 
-    pub fn set_path_attr(&mut self, mut path: VecDeque<usize>, attr: String, executer: &mut Executer) {
+    pub fn set_path_attr(&mut self, mut path: VecDeque<usize>, attr: String, value: String, executer: &mut Executer) {
         match path.pop_front() {
             Some(index) => {
                 match self.body.get_mut(index) {
                     Some(element) => {
                         if path.len() == 0 {
-                            element.set_attr(attr, executer);
+                            element.set_attr(attr, value, executer);
                         } else {
-                            element.set_path_attr(path, attr, executer);
+                            element.set_path_attr(path, attr, value, executer);
                         }
                     }
                     None => {
@@ -92,7 +96,7 @@ pub trait Element {
         executer.log_error("Element does not have text");
     }
 
-    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+    fn set_attr(&mut self, attr: String, value: String, executer: &mut Executer) {
         executer.log_error("Element does not have attributes");
     }
 
@@ -104,7 +108,7 @@ pub trait Element {
         executer.log_error("Element is not a container");
     }
 
-    fn set_path_attr(&mut self, path: VecDeque<usize>, attr: String, executer: &mut Executer) {
+    fn set_path_attr(&mut self, path: VecDeque<usize>, attr: String, value: String, executer: &mut Executer) {
         executer.log_error("Element is not a container");
     }
 }
@@ -114,11 +118,17 @@ pub struct Style {
     
 }
 
-pub fn parse(path: &str) -> anyhow::Result<Page> {
+pub fn parse_page(path: &str) -> anyhow::Result<Page> {
     let string = fs::read_to_string(path)?;
     let tags = parse_tags(&string)?;
     let page = tags_to_page(tags)?;
     Ok(page)
+}
+
+pub fn parse_string(string: &str) -> anyhow::Result<Elements> {
+    let tags = parse_tags(&string)?;
+    let elements = tags_to_elements(&tags)?;
+    Ok(elements)
 }
 
 #[derive(Debug, Clone)]
@@ -233,7 +243,6 @@ fn parse_tags(string: &str) -> anyhow::Result<Vec<TagOrText>> {
 fn tags_to_page(tags: Vec<TagOrText>) -> anyhow::Result<Page> {
     let mut title = "Untitled".to_string();
     let mut scripts = vec![];
-    let mut body = vec![];
     if let Some(TagOrText::Tag(head)) = tags.get(0) {
         if head.name == "head" {
             for tag in &head.children {
@@ -264,25 +273,34 @@ fn tags_to_page(tags: Vec<TagOrText>) -> anyhow::Result<Page> {
     } else {
         return Err(anyhow!("Page does not start with head"));
     }
-    if let Some(TagOrText::Tag(body_tag)) = tags.get(1) {
+    let body = if let Some(TagOrText::Tag(body_tag)) = tags.get(1) {
         if body_tag.name == "body" {
-            for tag in &body_tag.children {
-                match tag {
-                    TagOrText::Tag(tag) => {
-                        body.push(tag_to_elemets(tag.clone())?);
-                    }
-                    _ => {
-                        return Err(anyhow!("Text in body tag"));
-                    }
-                }
+            match tags_to_elements(&body_tag.children) {
+                Ok(body) => body,
+                Err(why) => return Err(why),
             }
         } else {
             return Err(anyhow!("Second tag is not body"));
         }
     } else {
         return Err(anyhow!("Second tag is not body"));
-    }
+    };
     Ok(Page { title, body, scripts })
+}
+
+fn tags_to_elements(tags: &Vec<TagOrText>) -> anyhow::Result<Elements> {
+    let mut elemets = vec![];
+    for tag in tags {
+        match tag {
+            TagOrText::Tag(tag) => {
+                elemets.push(tag_to_elemets(tag.clone())?);
+            }
+            _ => {
+                return Err(anyhow!("Text in body tag"));
+            }
+        }
+    }
+    Ok(elemets)
 }
 
 fn tag_to_elemets(tag: Tag) -> anyhow::Result<Box<dyn Element>> {

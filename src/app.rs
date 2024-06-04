@@ -1,5 +1,5 @@
-use eframe::egui::{self, Id, Sense, TextEdit};
-use crate::{parser::{parse, Page}, lua::Executer};
+use eframe::egui::{self, Id, ScrollArea, Sense, TextEdit, Vec2b};
+use crate::{parser::{parse_page, Page}, lua::Executer};
 
 pub struct App {
     file_text: String,
@@ -25,7 +25,7 @@ impl App {
     }
 
     fn load_page(&mut self) {
-        self.page = parse(&self.file_text);
+        self.page = parse_page(&self.file_text);
         self.executer.console.clear();
         if let Ok(page) = &self.page {
             self.executer.init_lua();
@@ -56,14 +56,16 @@ impl eframe::App for App {
         });
 
         if self.show_console {
-            egui::SidePanel::right("console").resizable(false).exact_width(100.0).show(ctx, |ui| {
-                for message in &self.executer.console {
-                    ui.label(message);
-                }
-                ui.interact(ui.max_rect(), Id::new("bg_side"), Sense::click()).context_menu(|ui| {
-                    if ui.button("Close console").clicked() {
-                        self.show_console = false;
-                        ui.close_menu();
+            egui::SidePanel::right("console").resizable(false).exact_width(150.0).show(ctx, |ui| {
+                ScrollArea::vertical().auto_shrink(Vec2b {x: false, y: false}).show(ui, |ui| {
+                    ui.interact(ui.max_rect(), Id::new("bg_side"), Sense::click()).context_menu(|ui| {
+                        if ui.button("Close console").clicked() {
+                            self.show_console = false;
+                            ui.close_menu();
+                        }
+                    });
+                    for message in &self.executer.console {
+                        ui.label(message);
                     }
                 });
             });
@@ -71,26 +73,28 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut location = None;
-            match &mut self.page {
-                Ok(page) => {
-                    self.executer.update_document(page, &mut location, ui.ctx());
-                    page.render(ui, &mut self.executer);
+            ScrollArea::both().auto_shrink(Vec2b {x: false, y: false}).show(ui, |ui| {
+                ui.interact(ui.max_rect(), Id::new("bg_central"), Sense::click()).context_menu(|ui| {
+                    if ui.button(if self.show_console { "Close console" } else { "Open console" }).clicked() {
+                        self.show_console = !self.show_console;
+                        ui.close_menu();
+                    }
+                });
+                match &mut self.page {
+                    Ok(page) => {
+                        self.executer.update_document(page, &mut location, ui.ctx());
+                        page.render(ui, &mut self.executer);
+                    }
+                    Err(why) => {
+                        ui.heading("Could not load page");
+                        ui.label(why.to_string());
+                    }
                 }
-                Err(why) => {
-                    ui.heading("Could not load page");
-                    ui.label(why.to_string());
-                }
-            }
+            });
             if let Some(location) = location {
                 self.file_text = location;
                 self.load_page();
             }
-            ui.interact(ui.max_rect(), Id::new("bg_central"), Sense::click()).context_menu(|ui| {
-                if ui.button(if self.show_console { "Close console" } else { "Open console" }).clicked() {
-                    self.show_console = !self.show_console;
-                    ui.close_menu();
-                }
-            });
         });
 
     }

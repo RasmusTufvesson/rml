@@ -1,8 +1,7 @@
 use std::{collections::VecDeque, sync::mpsc::{self, Receiver, SyncSender}};
 use eframe::egui::{Context, OpenUrl};
 use mlua::{Error, FromLua, Lua, Result, Table, UserData, Value};
-
-use crate::parser::Page;
+use crate::parser::{parse_string, Page};
 
 pub struct Executer {
     pub lua: Lua,
@@ -30,7 +29,16 @@ impl Executer {
         while let Ok(change) = self.changes.try_recv() {
             match change {
                 DocumentChange::Log(text) => self.log(text),
-                DocumentChange::SetInner(path, inner) => todo!(),
+                DocumentChange::SetInner(path, inner) => {
+                    let elements = match parse_string(&inner) {
+                        Ok(els) => els,
+                        Err(why) => {
+                            self.log_error(why);
+                            continue;
+                        }
+                    };
+                    page.set_path_inner(path, elements, self);
+                }
                 DocumentChange::SetText(path, text) => {
                     page.set_path_text(path, text, self);
                 }
@@ -39,6 +47,9 @@ impl Executer {
                 }
                 DocumentChange::OpenLink(link) => {
                     ctx.open_url(OpenUrl::same_tab(link));
+                }
+                DocumentChange::SetAttr(path, attr, value) => {
+                    page.set_path_attr(path, attr, value, self);
                 }
             }
         }
@@ -107,6 +118,21 @@ impl UserData for Document {
                 Err(_) => Err(Error::external("Could not send document change")),
             }
         });
+        methods.add_method("set_attr", |_, this, (path_table, attr, value): (Table, String, String)| {
+            let mut path: VecDeque<usize> = VecDeque::new();
+            for part in path_table.sequence_values::<usize>() {
+                match part {
+                    Ok(index) => path.push_back(index),
+                    Err(_) => {
+                        return Err(Error::external("Path has non usize elements"));
+                    }
+                }
+            }
+            match this.changes_sender.send(DocumentChange::SetAttr(path.into(), attr, value)) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::external("Could not send document change")),
+            }
+        });
         methods.add_method("log", |_, this, text: String| {
             match this.changes_sender.send(DocumentChange::Log(text)) {
                 Ok(_) => Ok(()),
@@ -134,4 +160,5 @@ pub enum DocumentChange {
     Log(String),
     SetLocation(String),
     OpenLink(String),
+    SetAttr(VecDeque<usize>, String, String),
 }

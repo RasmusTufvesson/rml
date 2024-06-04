@@ -27,4 +27,9 @@
         <link dst="dst.rml">link to rml file</link>
         <fakelink onclick="click_link()">actually a button</fakelink>
     </div>
+    <button onclick="document:set_inner({6}, '<h>See it works</h><p>(:</p>')">Click this button to change the contents of the div</button>
+    <div>
+        <p>Something something div</p>
+    </div>
+    <button onclick="document:set_attr({3}, 'align', 'max')">Change align of div</button>
 </body>

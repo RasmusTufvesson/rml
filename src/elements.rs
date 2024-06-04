@@ -46,9 +46,9 @@ impl Element for Button {
         self.text = text;
     }
 
-    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+    fn set_attr(&mut self, attr: String, value: String, executer: &mut Executer) {
         if attr == "onclick" {
-            self.on_click = attr;
+            self.on_click = value;
         } else {
             executer.log_error(format!("Unknown attribute '{}'", attr))
         }
@@ -119,15 +119,15 @@ impl Element for Div {
         }
     }
 
-    fn set_path_attr(&mut self, mut path: std::collections::VecDeque<usize>, attr: String, executer: &mut Executer) {
+    fn set_path_attr(&mut self, mut path: std::collections::VecDeque<usize>, attr: String, value: String, executer: &mut Executer) {
         match path.pop_front() {
             Some(index) => {
                 match self.inner.get_mut(index) {
                     Some(element) => {
                         if path.len() == 0 {
-                            element.set_attr(attr, executer);
+                            element.set_attr(attr, value, executer);
                         } else {
-                            element.set_path_attr(path, attr, executer);
+                            element.set_path_attr(path, attr, value, executer);
                         }
                     }
                     None => {
@@ -136,21 +136,21 @@ impl Element for Div {
                 }
             }
             None => {
-                self.set_attr(attr, executer);
+                self.set_attr(attr, value, executer);
             }
         }
     }
 
-    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+    fn set_attr(&mut self, attr: String, value: String, executer: &mut Executer) {
         match attr.as_str() {
             "direction" => {
-                let direction = match attr.as_str() {
+                let direction = match value.as_str() {
                     "down" => eframe::egui::Direction::TopDown,
                     "up" => eframe::egui::Direction::BottomUp,
                     "left" => eframe::egui::Direction::RightToLeft,
                     "right" => eframe::egui::Direction::LeftToRight,
                     _ => {
-                        executer.log_error(format!("Invalid direction '{}'", attr));
+                        executer.log_error(format!("Invalid direction '{}'", value));
                         return;
                     }
                 };
@@ -164,12 +164,12 @@ impl Element for Div {
                 }
             }
             "align" => {
-                let align = match attr.as_str() {
+                let align = match value.as_str() {
                     "center" => eframe::egui::Align::Center,
                     "max" => eframe::egui::Align::Max,
                     "min" => eframe::egui::Align::Min,
                     _ => {
-                        executer.log_error(format!("Invalid align '{}'", attr));
+                        executer.log_error(format!("Invalid align '{}'", value));
                         return;
                     }
                 };
@@ -217,9 +217,9 @@ impl Element for WebLink {
         self.text = text;
     }
 
-    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+    fn set_attr(&mut self, attr: String, value: String, executer: &mut Executer) {
         if attr == "dst" {
-            self.dst = attr;
+            self.dst = value;
         } else {
             executer.log_error(format!("Unknown attribute '{}'", attr))
         }
@@ -242,9 +242,9 @@ impl Element for Link {
         self.text = text;
     }
 
-    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+    fn set_attr(&mut self, attr: String, value: String, executer: &mut Executer) {
         if attr == "dst" {
-            self.dst = attr;
+            self.dst = value;
         } else {
             executer.log_error(format!("Unknown attribute '{}'", attr))
         }
@@ -267,9 +267,9 @@ impl Element for FakeLink {
         self.text = text;
     }
 
-    fn set_attr(&mut self, attr: String, executer: &mut Executer) {
+    fn set_attr(&mut self, attr: String, value: String, executer: &mut Executer) {
         if attr == "onclick" {
-            self.on_click = attr;
+            self.on_click = value;
         } else {
             executer.log_error(format!("Unknown attribute '{}'", attr))
         }
