@@ -119,6 +119,12 @@ impl UserData for Document {
                 Err(_) => Err(Error::external("Could not send document change")),
             }
         });
+        methods.add_method("open_url", |_, this, url: String| {
+            match this.changes_sender.send(DocumentChange::OpenLink(url)) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::external("Could not send document change")),
+            }
+        });
     }
 }
 
