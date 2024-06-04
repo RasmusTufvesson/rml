@@ -1,4 +1,4 @@
-use eframe::egui::{self, TextEdit};
+use eframe::egui::{self, Id, Sense, TextEdit};
 use crate::{parser::{parse, Page}, lua::Executer};
 
 pub struct App {
@@ -60,6 +60,12 @@ impl eframe::App for App {
                 for message in &self.executer.console {
                     ui.label(message);
                 }
+                ui.interact(ui.max_rect(), Id::new("bg_side"), Sense::click()).context_menu(|ui| {
+                    if ui.button("Close console").clicked() {
+                        self.show_console = false;
+                        ui.close_menu();
+                    }
+                });
             });
         }
 
@@ -79,6 +85,13 @@ impl eframe::App for App {
                 self.file_text = location;
                 self.load_page();
             }
+            ui.interact(ui.max_rect(), Id::new("bg_central"), Sense::click()).context_menu(|ui| {
+                if ui.button(if self.show_console { "Close console" } else { "Open console" }).clicked() {
+                    self.show_console = !self.show_console;
+                    ui.close_menu();
+                }
+            });
         });
+
     }
 }
